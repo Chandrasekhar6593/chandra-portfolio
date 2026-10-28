@@ -1,5 +1,7 @@
 # Nangili Chandra Sekhar — 3D Portfolio
 
+**Live:** <https://chandrasekhar6593.github.io/chandra-portfolio/>
+
 A single-page, 3D portfolio built for SDM / telecom deployment roles.
 No build step, no framework — plain HTML, CSS and Three.js.
 
@@ -50,21 +52,14 @@ from your current resume.
 
 ## Deploy it free
 
-**GitHub Pages** (works with the `gh` CLI you already have):
+Already deployed with **GitHub Pages** from the `main` branch (root).
+Any push to `main` republishes the site automatically.
 
-```powershell
-cd "C:\Users\chand\OneDrive\Documents\Default Project"
-git init -b main
-git add .
-git commit -m "Add portfolio site"
-gh repo create chandra-portfolio --public --source=. --push
-gh api -X POST repos/:owner/chandra-portfolio/pages -f "source[branch]=main" -f "source[path]=/"
-```
+To move it to a custom domain or another host:
 
-Site URL: `https://<your-username>.github.io/chandra-portfolio/`
-
-**Netlify / Vercel** — drag the folder onto <https://app.netlify.com/drop>, or
-import the repo. No build command, publish directory `.`.
+- **Netlify / Vercel** — drag the folder onto <https://app.netlify.com/drop>, or
+  import the repo. No build command, publish directory `.`.
+- **Custom domain** — add a `CNAME` file with your domain and configure DNS.
 
 ## Notes
 
