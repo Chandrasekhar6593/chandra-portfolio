@@ -1,5 +1,7 @@
 /* ============================================================
    Nangili Chandra Sekhar — portfolio interactions
+   Scene: global telecom mesh — wireframe globe, roaming arcs,
+   orbit rings and starfield.
    ============================================================ */
 (function () {
   "use strict";
@@ -7,15 +9,14 @@
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---------------------------------------------------------
-     1. Hero 3D scene — a telecom core: central node, orbiting
-        network functions, inter-node links, particle field.
+     1. Hero 3D scene
      --------------------------------------------------------- */
   function initScene() {
     var canvas = document.getElementById("scene");
     if (!canvas || !window.THREE || reduceMotion) return;
 
     var THREE = window.THREE;
-    var renderer, scene, camera, net, nodes = [], clock;
+    var renderer;
 
     try {
       renderer = new THREE.WebGLRenderer({
@@ -35,237 +36,214 @@
       renderer.outputEncoding = THREE.sRGBEncoding;
     }
 
-    scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x05070d, 0.02);
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+    camera.position.set(0, 0, 15.5);
 
-    camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
-    camera.position.set(0, 0, 17);
+    var clock = new THREE.Clock();
 
-    clock = new THREE.Clock();
-    net = new THREE.Group();
-    scene.add(net);
+    var root = new THREE.Group();
+    scene.add(root);
 
-    /* ---------- lights ---------- */
-    scene.add(new THREE.AmbientLight(0x4a5c8c, 1.15));
+    var globeRoot = new THREE.Group();
+    root.add(globeRoot);
 
-    var cyanLight = new THREE.PointLight(0x2ef2d0, 55, 40, 2);
-    cyanLight.position.set(6, 7, 9);
-    scene.add(cyanLight);
+    var globe = new THREE.Group();
+    globeRoot.add(globe);
 
-    var blueLight = new THREE.PointLight(0x4f8cff, 45, 40, 2);
-    blueLight.position.set(-8, -5, 7);
-    scene.add(blueLight);
+    var R = 2.4;
 
-    var violetLight = new THREE.PointLight(0x9b6bff, 35, 40, 2);
-    violetLight.position.set(0, -7, -6);
-    scene.add(violetLight);
-
-    /* ---------- glow sprite texture (procedural) ---------- */
-    function glowTexture() {
-      var size = 128;
+    /* ---------- soft halo behind the globe ---------- */
+    function radialTexture() {
+      var size = 256;
       var c = document.createElement("canvas");
       c.width = c.height = size;
       var g = c.getContext("2d");
       var grd = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-      grd.addColorStop(0, "rgba(120,255,232,1)");
-      grd.addColorStop(0.22, "rgba(46,242,208,0.55)");
-      grd.addColorStop(0.55, "rgba(79,140,255,0.14)");
-      grd.addColorStop(1, "rgba(79,140,255,0)");
+      grd.addColorStop(0, "rgba(90,255,232,0.85)");
+      grd.addColorStop(0.18, "rgba(46,242,208,0.35)");
+      grd.addColorStop(0.45, "rgba(79,140,255,0.14)");
+      grd.addColorStop(0.75, "rgba(155,107,255,0.06)");
+      grd.addColorStop(1, "rgba(0,0,0,0)");
       g.fillStyle = grd;
       g.fillRect(0, 0, size, size);
       return new THREE.CanvasTexture(c);
     }
 
-    var glowMap = glowTexture();
-
-    /* ---------- core ---------- */
-    var core = new THREE.Group();
-    net.add(core);
-
-    var coreShell = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(1.45, 1),
-      new THREE.MeshStandardMaterial({
-        color: 0x0a2130,
-        emissive: 0x1de9c4,
-        emissiveIntensity: 0.35,
-        metalness: 0.85,
-        roughness: 0.28,
-        flatShading: true,
-        transparent: true,
-        opacity: 0.92
-      })
-    );
-    core.add(coreShell);
-
-    var coreWire = new THREE.LineSegments(
-      new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.46, 1)),
-      new THREE.LineBasicMaterial({
-        color: 0x5effe4,
-        transparent: true,
-        opacity: 0.5
-      })
-    );
-    core.add(coreWire);
-
-    var halo = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: glowMap,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        depthWrite: false,
-        opacity: 0.85
-      })
-    );
-    halo.scale.set(8.5, 8.5, 1);
-    core.add(halo);
-
-    var innerCore = new THREE.Mesh(
-      new THREE.SphereGeometry(0.34, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0xd8fff8 })
-    );
-    core.add(innerCore);
-
-    /* ---------- orbiting network functions ---------- */
-    var NODES = 21;
-    var position = new THREE.Vector3();
-    var nodeGeo = new THREE.SphereGeometry(0.075, 12, 12);
-    var linkPositions = [];
-    var peerPositions = [];
-
-    function fibonacciSphere(i, total, radius) {
-      var y = 1 - (i / (total - 1)) * 2;
-      var r = Math.sqrt(Math.max(0, 1 - y * y));
-      var theta = i * 2.399963229728653;
-      return new THREE.Vector3(
-        Math.cos(theta) * r * radius,
-        y * radius,
-        Math.sin(theta) * r * radius
-      );
-    }
-
-    var basePositions = [];
-
-    for (var i = 0; i < NODES; i++) {
-      var radius = 3.9 + Math.random() * 1.5;
-      var p = fibonacciSphere(i, NODES, radius);
-      p.x += (Math.random() - 0.5) * 0.9;
-      p.y += (Math.random() - 0.5) * 0.9;
-      p.z += (Math.random() - 0.5) * 0.9;
-      basePositions.push(p.clone());
-
-      var isAccent = i % 4 === 0;
-      var mat = new THREE.MeshStandardMaterial({
-        color: isAccent ? 0x8fe9ff : 0xbcd2ff,
-        emissive: isAccent ? 0x2ef2d0 : 0x4f8cff,
-        emissiveIntensity: isAccent ? 1.5 : 0.95,
-        metalness: 0.5,
-        roughness: 0.35
-      });
-
-      var node = new THREE.Mesh(nodeGeo, mat);
-      node.position.copy(p);
-      node.userData.phase = Math.random() * Math.PI * 2;
-      node.userData.base = p.clone();
-      node.userData.speed = 0.6 + Math.random() * 0.9;
-      net.add(node);
-      nodes.push(node);
-
-      // link: core -> node
-      position.set(0, 0, 0);
-      linkPositions.push(0, 0, 0, p.x, p.y, p.z);
-    }
-
-    /* ---------- peer links between nearby nodes ---------- */
-    for (var a = 0; a < NODES; a++) {
-      var nearest = [];
-      for (var b = 0; b < NODES; b++) {
-        if (a === b) continue;
-        nearest.push({ i: b, d: basePositions[a].distanceTo(basePositions[b]) });
-      }
-      nearest.sort(function (m, n) { return m.d - n.d; });
-      for (var k = 0; k < 2; k++) {
-        var other = nearest[k];
-        if (!other || other.d > 2.4) continue;
-        var pa = basePositions[a];
-        var pb = basePositions[other.i];
-        peerPositions.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
-      }
-    }
-
-    var linkGeo = new THREE.BufferGeometry();
-    linkGeo.setAttribute("position", new THREE.Float32BufferAttribute(linkPositions, 3));
-    net.add(new THREE.LineSegments(
-      linkGeo,
-      new THREE.LineBasicMaterial({ color: 0x2ef2d0, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending })
-    ));
-
-    var peerGeo = new THREE.BufferGeometry();
-    peerGeo.setAttribute("position", new THREE.Float32BufferAttribute(peerPositions, 3));
-    net.add(new THREE.LineSegments(
-      peerGeo,
-      new THREE.LineBasicMaterial({ color: 0x6f9dff, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending })
-    ));
-
-    /* ---------- orbital rings ---------- */
-    var ringMaterial = new THREE.MeshBasicMaterial({
-      color: 0x4f8cff,
+    var halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: radialTexture(),
+      blending: THREE.AdditiveBlending,
       transparent: true,
-      opacity: 0.12,
-      side: THREE.DoubleSide
+      depthWrite: false,
+      opacity: 0.42
+    }));
+    halo.scale.set(9.5, 9.5, 1);
+    halo.position.z = -1.2;
+    globeRoot.add(halo);
+
+    /* ---------- wireframe globe ---------- */
+    var SEG = 128;
+
+    var cyanLine = new THREE.LineBasicMaterial({
+      color: 0x5cf7e0, transparent: true, opacity: 0.26,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    var blueLine = new THREE.LineBasicMaterial({
+      color: 0x5f97ff, transparent: true, opacity: 0.36,
+      blending: THREE.AdditiveBlending, depthWrite: false
     });
 
-    var ringConfigs = [
-      { r: 3.3, tilt: 0.9, rot: 0.2 },
-      { r: 4.9, tilt: -0.6, rot: 1.1 },
-      { r: 6.3, tilt: 0.35, rot: -0.7 }
-    ];
+    // latitude circles
+    [-60, -30, 0, 30, 60].forEach(function (lat, idx) {
+      var phi = (lat * Math.PI) / 180;
+      var r = Math.cos(phi) * R;
+      var y = Math.sin(phi) * R;
+      var pts = [];
+      for (var s = 0; s <= SEG; s++) {
+        var th = (s / SEG) * Math.PI * 2;
+        pts.push(new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r));
+      }
+      globe.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        idx === 2 ? blueLine : cyanLine
+      ));
+    });
 
-    var rings = [];
-
-    ringConfigs.forEach(function (cfg, idx) {
-      var ring = new THREE.Mesh(
-        new THREE.TorusGeometry(cfg.r, 0.006, 6, 180),
-        ringMaterial.clone()
+    // meridian great circles
+    for (var m = 0; m < 6; m++) {
+      var mpts = [];
+      for (var s2 = 0; s2 <= SEG; s2++) {
+        var t2 = (s2 / SEG) * Math.PI * 2;
+        mpts.push(new THREE.Vector3(Math.cos(t2) * R, Math.sin(t2) * R, 0));
+      }
+      var mline = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(mpts),
+        m % 3 === 0 ? blueLine : cyanLine
       );
-      ring.material.opacity = 0.1 + idx * 0.04;
+      mline.rotation.y = (m / 6) * Math.PI;
+      globe.add(mline);
+    }
+
+    // thin atmosphere shell
+    var atmo = new THREE.Mesh(
+      new THREE.SphereGeometry(R * 1.06, 48, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0x2f88a8, transparent: true, opacity: 0.1,
+        side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false
+      })
+    );
+    globe.add(atmo);
+
+    /* ---------- roaming arcs with travelling pulses ---------- */
+    var arcColors = [0x2ef2d0, 0x6fa8ff, 0x9b6bff, 0xd8fff8];
+    var arcs = [];
+
+    function surfacePoint(radius) {
+      var u = Math.random() * 2 - 1;
+      var th = Math.random() * Math.PI * 2;
+      var s = Math.sqrt(Math.max(0, 1 - u * u));
+      return new THREE.Vector3(Math.cos(th) * s * radius, u * radius, Math.sin(th) * s * radius);
+    }
+
+    var made = 0;
+    var attempt = 0;
+    while (made < 11 && attempt < 600) {
+      attempt++;
+      var a = surfacePoint(R);
+      var b = surfacePoint(R);
+      var dist = a.distanceTo(b);
+      if (dist < 2.3) continue;
+
+      var mid = a.clone().add(b).multiplyScalar(0.5);
+      mid.normalize().multiplyScalar(R + dist * 0.32);
+
+      var curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+      var geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(72));
+
+      globe.add(new THREE.Line(geo, new THREE.LineBasicMaterial({
+        color: arcColors[made % arcColors.length],
+        transparent: true,
+        opacity: 0.48,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })));
+
+      var dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.048, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xeafffb, transparent: true, opacity: 0.95 })
+      );
+      globe.add(dot);
+
+      arcs.push({
+        curve: curve,
+        dot: dot,
+        t: Math.random(),
+        speed: 0.05 + Math.random() * 0.07
+      });
+      made++;
+    }
+
+    /* ---------- orbit rings + satellites ---------- */
+    var rings = [];
+    [
+      { r: 3.15, tilt: 1.15, rot: 0.4, color: 0x4f8cff },
+      { r: 3.75, tilt: -0.72, rot: 1.2, color: 0x9b6bff },
+      { r: 4.35, tilt: 0.45, rot: -0.7, color: 0x2ef2d0 }
+    ].forEach(function (cfg, idx) {
+      var ring = new THREE.Mesh(
+        new THREE.TorusGeometry(cfg.r, 0.0075, 6, 220),
+        new THREE.MeshBasicMaterial({
+          color: cfg.color, transparent: true, opacity: 0.36,
+          blending: THREE.AdditiveBlending, depthWrite: false
+        })
+      );
       ring.rotation.x = Math.PI / 2 + cfg.tilt;
-      ring.rotation.y = cfg.rot;
-      ring.userData.spin = (idx % 2 === 0 ? 1 : -1) * (0.05 + idx * 0.02);
-      net.add(ring);
-      rings.push(ring);
+      ring.rotation.z = cfg.rot;
+      globeRoot.add(ring);
+
+      var sat = new THREE.Mesh(
+        new THREE.SphereGeometry(0.055, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xd6fff7 })
+      );
+      ring.add(sat);
+
+      rings.push({
+        sat: sat,
+        radius: cfg.r,
+        speed: 0.22 + idx * 0.11,
+        phase: idx * 2.1
+      });
     });
 
-    /* ---------- particle field ---------- */
-    var particleCount = 850;
-    var particlePositions = new Float32Array(particleCount * 3);
-    for (var q = 0; q < particleCount; q++) {
-      var dist = 9 + Math.random() * 16;
+    /* ---------- starfield ---------- */
+    var STAR_COUNT = 1100;
+    var starPositions = new Float32Array(STAR_COUNT * 3);
+    for (var i = 0; i < STAR_COUNT; i++) {
+      var d = 16 + Math.random() * 34;
       var v = new THREE.Vector3(
         Math.random() * 2 - 1,
         Math.random() * 2 - 1,
         Math.random() * 2 - 1
-      ).normalize().multiplyScalar(dist);
-      particlePositions[q * 3] = v.x;
-      particlePositions[q * 3 + 1] = v.y;
-      particlePositions[q * 3 + 2] = v.z;
+      ).normalize().multiplyScalar(d);
+      starPositions[i * 3] = v.x;
+      starPositions[i * 3 + 1] = v.y;
+      starPositions[i * 3 + 2] = v.z;
     }
-
-    var particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
-    var particles = new THREE.Points(particleGeo, new THREE.PointsMaterial({
-      color: 0x9fb8e8,
-      size: 0.055,
+    var starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+    var stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+      color: 0xa9c2ef,
+      size: 0.16,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.6,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       sizeAttenuation: true
     }));
-    scene.add(particles);
+    scene.add(stars);
 
-    /* ---------- responsive layout ---------- */
+    /* ---------- responsive framing ---------- */
     var hero = canvas.parentElement;
-    var isWide = true;
 
     function resize() {
       var w = hero.clientWidth || window.innerWidth;
@@ -273,15 +251,14 @@
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
 
-      isWide = w >= 900;
-      if (isWide) {
-        net.position.set(3.6, 0.2, 0);
-        net.scale.setScalar(1);
-        camera.position.z = 17;
+      if (w >= 900) {
+        globeRoot.position.set(3.7, 0, 0);
+        globeRoot.scale.setScalar(1);
+        camera.position.z = 15.5;
       } else {
-        net.position.set(0, 1.6, -2);
-        net.scale.setScalar(0.78);
-        camera.position.z = 19;
+        globeRoot.position.set(0, 1.4, -1.6);
+        globeRoot.scale.setScalar(0.82);
+        camera.position.z = 16.5;
       }
       camera.updateProjectionMatrix();
     }
@@ -295,57 +272,56 @@
 
     /* ---------- pointer parallax ---------- */
     var pointer = { x: 0, y: 0 };
-    var target = { x: 0, y: 0 };
+    var smooth = { x: 0, y: 0 };
 
     window.addEventListener("pointermove", function (e) {
       pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
       pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
     }, { passive: true });
 
-    /* ---------- animation loop ---------- */
+    /* ---------- loop ---------- */
     var running = false;
     var rafId = null;
+    var visible = true;
+    var spin = 0;
 
     function frame() {
       rafId = requestAnimationFrame(frame);
 
+      var dt = Math.min(clock.getDelta(), 0.05);
       var t = clock.getElapsedTime();
 
-      target.x += (pointer.x - target.x) * 0.045;
-      target.y += (pointer.y - target.y) * 0.045;
+      smooth.x += (pointer.x - smooth.x) * 0.045;
+      smooth.y += (pointer.y - smooth.y) * 0.045;
 
-      net.rotation.y = t * 0.15 + target.x * 0.35;
-      net.rotation.x = Math.sin(t * 0.22) * 0.1 + target.y * 0.22;
-      net.rotation.z = Math.sin(t * 0.14) * 0.05;
+      spin += dt * 0.11;
+      globe.rotation.y = spin;
 
-      core.rotation.y = -t * 0.3;
-      core.rotation.x = t * 0.18;
-      coreShell.scale.setScalar(1 + Math.sin(t * 1.6) * 0.025);
-      halo.material.opacity = 0.72 + Math.sin(t * 1.4) * 0.16;
-      innerCore.scale.setScalar(1 + Math.sin(t * 2.4) * 0.12);
+      globeRoot.rotation.x = Math.sin(t * 0.2) * 0.07 + smooth.y * 0.2;
+      globeRoot.rotation.z = Math.sin(t * 0.16) * 0.03;
+      root.rotation.y = smooth.x * 0.28;
 
-      for (var i = 0; i < nodes.length; i++) {
-        var node = nodes[i];
-        var base = node.userData.base;
-        var ph = node.userData.phase;
-        node.position.set(
-          base.x + Math.sin(t * node.userData.speed + ph) * 0.16,
-          base.y + Math.cos(t * node.userData.speed * 0.8 + ph) * 0.16,
-          base.z + Math.sin(t * node.userData.speed * 0.6 + ph) * 0.16
-        );
-        node.scale.setScalar(1 + Math.sin(t * 2 + ph) * 0.22);
+      for (var i = 0; i < arcs.length; i++) {
+        var arc = arcs[i];
+        arc.t += dt * arc.speed;
+        if (arc.t > 1) arc.t -= 1;
+        arc.dot.position.copy(arc.curve.getPoint(arc.t));
+        arc.dot.scale.setScalar(1 + Math.sin(t * 6 + i) * 0.18);
       }
 
       for (var r = 0; r < rings.length; r++) {
-        rings[r].rotation.z += rings[r].userData.spin * 0.004;
+        var ring = rings[r];
+        var ang = t * ring.speed + ring.phase;
+        ring.sat.position.set(Math.cos(ang) * ring.radius, Math.sin(ang) * ring.radius, 0);
       }
 
-      particles.rotation.y = t * 0.012;
-      particles.rotation.x = Math.sin(t * 0.05) * 0.05;
+      halo.material.opacity = 0.36 + Math.sin(t * 1.1) * 0.07;
+      stars.rotation.y = t * 0.008;
+      stars.rotation.x = Math.sin(t * 0.04) * 0.03;
 
-      camera.position.x += (target.x * 1.1 - camera.position.x) * 0.05;
-      camera.position.y += (-target.y * 0.9 - camera.position.y) * 0.05;
-      camera.lookAt(net.position.x * 0.25, 0, 0);
+      camera.position.x += (smooth.x * 0.85 - camera.position.x) * 0.05;
+      camera.position.y += (-smooth.y * 0.65 - camera.position.y) * 0.05;
+      camera.lookAt(globeRoot.position.x * 0.18, 0, 0);
 
       renderer.render(scene, camera);
     }
@@ -364,8 +340,6 @@
       rafId = null;
     }
 
-    var visible = true;
-
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) stop();
       else if (visible) start();
@@ -383,7 +357,89 @@
   }
 
   /* ---------------------------------------------------------
-     2. Scroll reveal
+     2. Toast (feedback for copy actions)
+     --------------------------------------------------------- */
+  var toastTimer = null;
+
+  function toast(message) {
+    var el = document.getElementById("toast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "toast";
+      el.className = "toast";
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
+      document.body.appendChild(el);
+    }
+    el.textContent = message;
+    el.classList.add("show");
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(function () {
+      el.classList.remove("show");
+    }, 3200);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(function () {
+        return legacyCopy(text);
+      });
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+
+  function legacyCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (err) { /* ignore */ }
+    document.body.removeChild(ta);
+  }
+
+  /* ---------------------------------------------------------
+     3. Email / phone links — always give the user something
+     --------------------------------------------------------- */
+  function initContactLinks() {
+    var links = document.querySelectorAll('a[href^="mailto:"], a[href^="tel:"]');
+
+    Array.prototype.forEach.call(links, function (a) {
+      a.addEventListener("click", function (e) {
+        var href = a.getAttribute("href");
+        var isMail = href.indexOf("mailto:") === 0;
+        var value = href
+          .replace(/^mailto:/, "")
+          .replace(/^tel:/, "")
+          .split("?")[0]
+          .trim();
+
+        // keep the default behaviour so a configured mail/phone app still opens
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+
+        copyText(value).then(function () {
+          toast((isMail ? "Email copied — " : "Number copied — ") + value);
+        }, function () {
+          toast(isMail ? "Email: " + value : "Phone: " + value);
+        });
+      });
+    });
+
+    // make the address itself easy to select
+    Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (el) {
+      el.addEventListener("click", function () {
+        copyText(el.getAttribute("data-copy")).then(function () {
+          toast("Copied — " + el.getAttribute("data-copy"));
+        });
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------
+     4. Scroll reveal
      --------------------------------------------------------- */
   function initReveal() {
     var items = Array.prototype.slice.call(document.querySelectorAll(".reveal"));
@@ -394,7 +450,6 @@
       return;
     }
 
-    // stagger siblings inside the same grid/section
     items.forEach(function (el) {
       var siblings = el.parentElement
         ? Array.prototype.filter.call(el.parentElement.children, function (c) {
@@ -421,7 +476,7 @@
   }
 
   /* ---------------------------------------------------------
-     3. 3D tilt on cards (pointer only)
+     5. 3D tilt on cards (pointer only)
      --------------------------------------------------------- */
   function initTilt() {
     if (reduceMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
@@ -457,7 +512,7 @@
   }
 
   /* ---------------------------------------------------------
-     4. Animated counters
+     6. Animated counters
      --------------------------------------------------------- */
   function initCounters() {
     var nums = document.querySelectorAll("[data-count]");
@@ -502,7 +557,7 @@
   }
 
   /* ---------------------------------------------------------
-     5. Rotating role titles
+     7. Rotating role titles
      --------------------------------------------------------- */
   function initRoleRotator() {
     var el = document.getElementById("role-text");
@@ -554,7 +609,7 @@
   }
 
   /* ---------------------------------------------------------
-     6. Nav / progress / misc
+     8. Nav / progress / misc
      --------------------------------------------------------- */
   function initChrome() {
     var nav = document.getElementById("nav");
@@ -614,6 +669,7 @@
     initTilt();
     initCounters();
     initRoleRotator();
+    initContactLinks();
     initScene();
   }
 

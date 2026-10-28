@@ -577,6 +577,27 @@ strong { color: #fff; font-weight: 600; }
   .hero-actions .btn { flex: 1 1 100%; }
 }
 
+/* ================= toast ================= */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 2rem;
+  transform: translate(-50%, 20px);
+  z-index: 130;
+  max-width: calc(100vw - 2rem);
+  padding: 0.85rem 1.2rem;
+  border-radius: 999px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  color: #04121a;
+  background: var(--grad);
+  box-shadow: 0 18px 50px -20px rgba(46, 242, 208, 0.9);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s var(--ease);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
 /* ================= accessibility / motion ================= */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

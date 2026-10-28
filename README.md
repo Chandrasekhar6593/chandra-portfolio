@@ -27,8 +27,9 @@ Then open <http://localhost:8787>. Opening `index.html` directly also works.
 
 ## What's in the page
 
-- **3D hero** — a telecom-core visualisation: a central node with 21 orbiting
-  network functions, inter-node links, orbital rings and a particle field.
+- **3D hero** — a global telecom mesh: wireframe globe built from latitude and
+  meridian lines, 11 roaming arcs with travelling light pulses, three orbit
+  rings with satellites, a glowing atmosphere and a 1,100-point starfield.
   Reacts to the pointer, pauses when off-screen or the tab is hidden.
 - **Scroll reveals**, animated counters, typing role titles, scroll progress bar.
 - **3D tilt cards** for expertise and "how I work" sections.
