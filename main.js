@@ -1,19 +1,23 @@
 /* ============================================================
    Nangili Chandra Sekhar — portfolio interactions
-   Scene: global telecom mesh — wireframe globe, roaming arcs,
-   orbit rings and starfield.
+   - 3D "SDM core lattice" hero (Three.js)
+   - mobile nav, scroll reveal, active section, copy-to-clipboard
    ============================================================ */
 (function () {
   "use strict";
 
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /* ---------------------------------------------------------
-     1. Hero 3D scene
-     --------------------------------------------------------- */
+  /* =========================================================
+     1. Hero scene — subscriber data lattice
+     ========================================================= */
   function initScene() {
     var canvas = document.getElementById("scene");
-    if (!canvas || !window.THREE || reduceMotion) return;
+    var stage = document.getElementById("stage");
+    if (!canvas || !stage || !window.THREE) {
+      if (stage) stage.classList.add("no-webgl");
+      return;
+    }
 
     var THREE = window.THREE;
     var renderer;
@@ -26,651 +30,599 @@
         powerPreference: "high-performance"
       });
     } catch (err) {
-      canvas.style.display = "none";
+      stage.classList.add("no-webgl");
       return;
     }
 
+    var INK = 0x0f5f52;
+    var LEAF = 0x17806e;
+    var AMBER = 0xa9511f;
+
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setClearAlpha(0);
-    if ("outputEncoding" in renderer && THREE.sRGBEncoding) {
-      renderer.outputEncoding = THREE.sRGBEncoding;
-    }
 
     var scene = new THREE.Scene();
-    var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
-    camera.position.set(0, 0, 15.5);
-
-    var clock = new THREE.Clock();
+    var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    camera.position.set(0, 0, 7.4);
 
     var root = new THREE.Group();
+    root.rotation.z = -0.14;
     scene.add(root);
 
-    var globeRoot = new THREE.Group();
-    root.add(globeRoot);
-
-    var globe = new THREE.Group();
-    globeRoot.add(globe);
-
-    var R = 2.4;
-
-    /* ---------- soft halo behind the globe ---------- */
-    function radialTexture() {
-      var size = 256;
+    /* ---------- round sprite for points ---------- */
+    function dotTexture() {
+      var size = 64;
       var c = document.createElement("canvas");
       c.width = c.height = size;
       var g = c.getContext("2d");
       var grd = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-      grd.addColorStop(0, "rgba(90,255,232,0.85)");
-      grd.addColorStop(0.18, "rgba(46,242,208,0.35)");
-      grd.addColorStop(0.45, "rgba(79,140,255,0.14)");
-      grd.addColorStop(0.75, "rgba(155,107,255,0.06)");
-      grd.addColorStop(1, "rgba(0,0,0,0)");
+      grd.addColorStop(0, "rgba(15,95,82,1)");
+      grd.addColorStop(0.55, "rgba(15,95,82,0.85)");
+      grd.addColorStop(1, "rgba(15,95,82,0)");
       g.fillStyle = grd;
       g.fillRect(0, 0, size, size);
       return new THREE.CanvasTexture(c);
     }
 
-    var halo = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: radialTexture(),
-      blending: THREE.AdditiveBlending,
-      transparent: true,
-      depthWrite: false,
-      opacity: 0.42
-    }));
-    halo.scale.set(9.5, 9.5, 1);
-    halo.position.z = -1.2;
-    globeRoot.add(halo);
+    /* ---------- node cloud on a sphere ---------- */
+    var R = 2.45;
+    var COUNT = 150;
+    var points = [];
+    var golden = Math.PI * (3 - Math.sqrt(5));
 
-    /* ---------- wireframe globe ---------- */
-    var SEG = 128;
-
-    var cyanLine = new THREE.LineBasicMaterial({
-      color: 0x5cf7e0, transparent: true, opacity: 0.26,
-      blending: THREE.AdditiveBlending, depthWrite: false
-    });
-    var blueLine = new THREE.LineBasicMaterial({
-      color: 0x5f97ff, transparent: true, opacity: 0.36,
-      blending: THREE.AdditiveBlending, depthWrite: false
-    });
-
-    // latitude circles
-    [-60, -30, 0, 30, 60].forEach(function (lat, idx) {
-      var phi = (lat * Math.PI) / 180;
-      var r = Math.cos(phi) * R;
-      var y = Math.sin(phi) * R;
-      var pts = [];
-      for (var s = 0; s <= SEG; s++) {
-        var th = (s / SEG) * Math.PI * 2;
-        pts.push(new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r));
-      }
-      globe.add(new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(pts),
-        idx === 2 ? blueLine : cyanLine
+    for (var i = 0; i < COUNT; i++) {
+      var y = 1 - (i / (COUNT - 1)) * 2;
+      var r = Math.sqrt(Math.max(0, 1 - y * y));
+      var theta = golden * i;
+      var jitter = 0.94 + Math.random() * 0.1;
+      points.push(new THREE.Vector3(
+        Math.cos(theta) * r * R * jitter,
+        y * R * jitter,
+        Math.sin(theta) * r * R * jitter
       ));
-    });
-
-    // meridian great circles
-    for (var m = 0; m < 6; m++) {
-      var mpts = [];
-      for (var s2 = 0; s2 <= SEG; s2++) {
-        var t2 = (s2 / SEG) * Math.PI * 2;
-        mpts.push(new THREE.Vector3(Math.cos(t2) * R, Math.sin(t2) * R, 0));
-      }
-      var mline = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(mpts),
-        m % 3 === 0 ? blueLine : cyanLine
-      );
-      mline.rotation.y = (m / 6) * Math.PI;
-      globe.add(mline);
     }
 
-    // thin atmosphere shell
-    var atmo = new THREE.Mesh(
-      new THREE.SphereGeometry(R * 1.06, 48, 32),
+    var dotGeo = new THREE.BufferGeometry().setFromPoints(points);
+    var dotMat = new THREE.PointsMaterial({
+      size: 0.115,
+      map: dotTexture(),
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    root.add(new THREE.Points(dotGeo, dotMat));
+
+    /* ---------- edges between nearby nodes ---------- */
+    var segs = [];
+    var pulseEdges = [];
+    var MAX = 0.95;
+
+    for (var a = 0; a < points.length; a++) {
+      var links = 0;
+      for (var b = a + 1; b < points.length && links < 3; b++) {
+        var d = points[a].distanceTo(points[b]);
+        if (d < MAX) {
+          segs.push(points[a].x, points[a].y, points[a].z, points[b].x, points[b].y, points[b].z);
+          pulseEdges.push([points[a], points[b]]);
+          links++;
+        }
+      }
+    }
+
+    var lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute("position", new THREE.Float32BufferAttribute(segs, 3));
+    var lineMat = new THREE.LineBasicMaterial({
+      color: LEAF,
+      transparent: true,
+      opacity: 0.16
+    });
+    root.add(new THREE.LineSegments(lineGeo, lineMat));
+
+    /* ---------- inner core ---------- */
+    var core = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.92, 1),
       new THREE.MeshBasicMaterial({
-        color: 0x2f88a8, transparent: true, opacity: 0.1,
-        side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false
+        color: INK,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.13
       })
     );
-    globe.add(atmo);
+    root.add(core);
 
-    /* ---------- roaming arcs with travelling pulses ---------- */
-    var arcColors = [0x2ef2d0, 0x6fa8ff, 0x9b6bff, 0xd8fff8];
-    var arcs = [];
+    var coreGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.36, 24, 24),
+      new THREE.MeshBasicMaterial({ color: INK, transparent: true, opacity: 0.07 })
+    );
+    root.add(coreGlow);
 
-    function surfacePoint(radius) {
-      var u = Math.random() * 2 - 1;
-      var th = Math.random() * Math.PI * 2;
-      var s = Math.sqrt(Math.max(0, 1 - u * u));
-      return new THREE.Vector3(Math.cos(th) * s * radius, u * radius, Math.sin(th) * s * radius);
-    }
+    /* ---------- orbit rings ---------- */
+    var ringGroup = new THREE.Group();
+    root.add(ringGroup);
+    var ringSpecs = [
+      { r: 3.05, tilt: 0.42, roll: 0.2, op: 0.26 },
+      { r: 3.42, tilt: -0.62, roll: 0.9, op: 0.16 },
+      { r: 3.78, tilt: 1.12, roll: -0.4, op: 0.1 }
+    ];
 
-    var made = 0;
-    var attempt = 0;
-    while (made < 11 && attempt < 600) {
-      attempt++;
-      var a = surfacePoint(R);
-      var b = surfacePoint(R);
-      var dist = a.distanceTo(b);
-      if (dist < 2.3) continue;
-
-      var mid = a.clone().add(b).multiplyScalar(0.5);
-      mid.normalize().multiplyScalar(R + dist * 0.32);
-
-      var curve = new THREE.QuadraticBezierCurve3(a, mid, b);
-      var geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(72));
-
-      globe.add(new THREE.Line(geo, new THREE.LineBasicMaterial({
-        color: arcColors[made % arcColors.length],
+    ringSpecs.forEach(function (spec) {
+      var curve = new THREE.EllipseCurve(0, 0, spec.r, spec.r, 0, Math.PI * 2, false, 0);
+      var pts = curve.getPoints(160).map(function (p) {
+        return new THREE.Vector3(p.x, p.y, 0);
+      });
+      var geo = new THREE.BufferGeometry().setFromPoints(pts);
+      var mat = new THREE.LineBasicMaterial({
+        color: INK,
         transparent: true,
-        opacity: 0.48,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-      })));
-
-      var dot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.048, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xeafffb, transparent: true, opacity: 0.95 })
-      );
-      globe.add(dot);
-
-      arcs.push({
-        curve: curve,
-        dot: dot,
-        t: Math.random(),
-        speed: 0.05 + Math.random() * 0.07
+        opacity: spec.op
       });
-      made++;
-    }
-
-    /* ---------- orbit rings + satellites ---------- */
-    var rings = [];
-    [
-      { r: 3.15, tilt: 1.15, rot: 0.4, color: 0x4f8cff },
-      { r: 3.75, tilt: -0.72, rot: 1.2, color: 0x9b6bff },
-      { r: 4.35, tilt: 0.45, rot: -0.7, color: 0x2ef2d0 }
-    ].forEach(function (cfg, idx) {
-      var ring = new THREE.Mesh(
-        new THREE.TorusGeometry(cfg.r, 0.0075, 6, 220),
-        new THREE.MeshBasicMaterial({
-          color: cfg.color, transparent: true, opacity: 0.36,
-          blending: THREE.AdditiveBlending, depthWrite: false
-        })
-      );
-      ring.rotation.x = Math.PI / 2 + cfg.tilt;
-      ring.rotation.z = cfg.rot;
-      globeRoot.add(ring);
-
-      var sat = new THREE.Mesh(
-        new THREE.SphereGeometry(0.055, 10, 10),
-        new THREE.MeshBasicMaterial({ color: 0xd6fff7 })
-      );
-      ring.add(sat);
-
-      rings.push({
-        sat: sat,
-        radius: cfg.r,
-        speed: 0.22 + idx * 0.11,
-        phase: idx * 2.1
-      });
+      var ring = new THREE.LineLoop(geo, mat);
+      ring.rotation.x = spec.tilt;
+      ring.rotation.y = spec.roll;
+      ringGroup.add(ring);
     });
 
-    /* ---------- starfield ---------- */
-    var STAR_COUNT = 1100;
-    var starPositions = new Float32Array(STAR_COUNT * 3);
-    for (var i = 0; i < STAR_COUNT; i++) {
-      var d = 16 + Math.random() * 34;
-      var v = new THREE.Vector3(
-        Math.random() * 2 - 1,
-        Math.random() * 2 - 1,
-        Math.random() * 2 - 1
-      ).normalize().multiplyScalar(d);
-      starPositions[i * 3] = v.x;
-      starPositions[i * 3 + 1] = v.y;
-      starPositions[i * 3 + 2] = v.z;
+    /* ---------- travelling signal pulses ---------- */
+    var pulses = [];
+    var PULSES = 9;
+
+    for (var p = 0; p < PULSES; p++) {
+      var mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.038, 10, 10),
+        new THREE.MeshBasicMaterial({ color: p % 3 === 0 ? AMBER : LEAF })
+      );
+      var edge = pulseEdges[Math.floor(Math.random() * pulseEdges.length)];
+      if (!edge) continue;
+      mesh.userData = {
+        from: edge[0].clone(),
+        to: edge[1].clone(),
+        t: Math.random(),
+        speed: 0.0022 + Math.random() * 0.0042
+      };
+      pulses.push(mesh);
+      root.add(mesh);
     }
-    var starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
-    var stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
-      color: 0xa9c2ef,
-      size: 0.16,
-      transparent: true,
-      opacity: 0.6,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      sizeAttenuation: true
-    }));
-    scene.add(stars);
 
-    /* ---------- responsive framing ---------- */
-    var hero = canvas.parentElement;
+    /* ---------- pointer + scroll response ---------- */
+    var pointer = { x: 0, y: 0 };
+    var target = { x: 0, y: 0 };
+    var scrollTilt = 0;
 
+    if (!reduceMotion) {
+      window.addEventListener("pointermove", function (e) {
+        pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
+      }, { passive: true });
+
+      window.addEventListener("scroll", function () {
+        scrollTilt = Math.min(window.pageYOffset / 900, 1);
+      }, { passive: true });
+    }
+
+    /* ---------- sizing ---------- */
     function resize() {
-      var w = hero.clientWidth || window.innerWidth;
-      var h = hero.clientHeight || window.innerHeight;
+      var w = stage.clientWidth;
+      var h = stage.clientHeight;
+      if (!w || !h) return;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
-
-      if (w >= 900) {
-        globeRoot.position.set(3.7, 0, 0);
-        globeRoot.scale.setScalar(1);
-        camera.position.z = 15.5;
-      } else {
-        globeRoot.position.set(0, 1.4, -1.6);
-        globeRoot.scale.setScalar(0.82);
-        camera.position.z = 16.5;
-      }
       camera.updateProjectionMatrix();
     }
-    resize();
 
-    if (window.ResizeObserver) {
-      new ResizeObserver(resize).observe(hero);
-    } else {
-      window.addEventListener("resize", resize);
+    resize();
+    if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
+    else window.addEventListener("resize", resize);
+
+    /* ---------- pause when off-screen ---------- */
+    var running = true;
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        running = entries[0].isIntersecting;
+      }, { threshold: 0.05 }).observe(stage);
     }
 
-    /* ---------- pointer parallax ---------- */
-    var pointer = { x: 0, y: 0 };
-    var smooth = { x: 0, y: 0 };
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) running = running || true;
+    });
 
-    window.addEventListener("pointermove", function (e) {
-      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-      pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
-    }, { passive: true });
-
-    /* ---------- loop ---------- */
-    var running = false;
-    var rafId = null;
-    var visible = true;
-    var spin = 0;
+    /* ---------- animation ---------- */
+    var clock = new THREE.Clock();
 
     function frame() {
-      rafId = requestAnimationFrame(frame);
+      requestAnimationFrame(frame);
+      if (!running) return;
 
       var dt = Math.min(clock.getDelta(), 0.05);
-      var t = clock.getElapsedTime();
+      var t = clock.elapsedTime;
 
-      smooth.x += (pointer.x - smooth.x) * 0.045;
-      smooth.y += (pointer.y - smooth.y) * 0.045;
+      if (!reduceMotion) {
+        target.x += (pointer.y * 0.16 - target.x) * 0.05;
+        target.y += (pointer.x * 0.22 - target.y) * 0.05;
 
-      spin += dt * 0.11;
-      globe.rotation.y = spin;
+        root.rotation.y += dt * 0.14;
+        root.rotation.x = target.x + Math.sin(t * 0.3) * 0.04 + scrollTilt * 0.16;
+        root.rotation.y += target.y * dt;
 
-      globeRoot.rotation.x = Math.sin(t * 0.2) * 0.07 + smooth.y * 0.2;
-      globeRoot.rotation.z = Math.sin(t * 0.16) * 0.03;
-      root.rotation.y = smooth.x * 0.28;
+        ringGroup.rotation.z += dt * 0.05;
+        ringGroup.rotation.x = Math.sin(t * 0.22) * 0.08 - scrollTilt * 0.1;
 
-      for (var i = 0; i < arcs.length; i++) {
-        var arc = arcs[i];
-        arc.t += dt * arc.speed;
-        if (arc.t > 1) arc.t -= 1;
-        arc.dot.position.copy(arc.curve.getPoint(arc.t));
-        arc.dot.scale.setScalar(1 + Math.sin(t * 6 + i) * 0.18);
+        core.rotation.y -= dt * 0.3;
+        core.rotation.x += dt * 0.12;
+
+        pulses.forEach(function (mesh) {
+          var u = mesh.userData;
+          u.t += u.speed;
+          if (u.t > 1) {
+            u.t = 0;
+            var next = pulseEdges[Math.floor(Math.random() * pulseEdges.length)];
+            if (next) { u.from.copy(next[0]); u.to.copy(next[1]); }
+          }
+          mesh.position.lerpVectors(u.from, u.to, u.t);
+          var s = 0.65 + Math.sin(u.t * Math.PI) * 0.7;
+          mesh.scale.setScalar(s);
+        });
       }
-
-      for (var r = 0; r < rings.length; r++) {
-        var ring = rings[r];
-        var ang = t * ring.speed + ring.phase;
-        ring.sat.position.set(Math.cos(ang) * ring.radius, Math.sin(ang) * ring.radius, 0);
-      }
-
-      halo.material.opacity = 0.36 + Math.sin(t * 1.1) * 0.07;
-      stars.rotation.y = t * 0.008;
-      stars.rotation.x = Math.sin(t * 0.04) * 0.03;
-
-      camera.position.x += (smooth.x * 0.85 - camera.position.x) * 0.05;
-      camera.position.y += (-smooth.y * 0.65 - camera.position.y) * 0.05;
-      camera.lookAt(globeRoot.position.x * 0.18, 0, 0);
 
       renderer.render(scene, camera);
     }
 
-    function start() {
-      if (running) return;
-      running = true;
-      clock.start();
-      frame();
+    frame();
+  }
+
+  /* =========================================================
+     2. Contact scene — open channel beacon
+     ========================================================= */
+  function initContactScene() {
+    var canvas = document.getElementById("contact-scene");
+    var stage = document.getElementById("contact-stage");
+    if (!canvas || !stage || !window.THREE) return;
+
+    var THREE = window.THREE;
+    var renderer;
+
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        antialias: true,
+        alpha: true,
+        powerPreference: "low-power"
+      });
+    } catch (err) {
+      return;
     }
 
-    function stop() {
-      if (!running) return;
-      running = false;
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = null;
-    }
+    var MINT = 0x7fd6c2;
+    var PAPER = 0xf6f4ef;
 
-    document.addEventListener("visibilitychange", function () {
-      if (document.hidden) stop();
-      else if (visible) start();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearAlpha(0);
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    camera.position.set(0, 0, 7.9);
+
+    var root = new THREE.Group();
+    root.rotation.z = -0.18;
+    scene.add(root);
+
+    var globe = new THREE.Group();
+    root.add(globe);
+
+    var R = 1.95;
+    var lineMat = new THREE.LineBasicMaterial({
+      color: MINT,
+      transparent: true,
+      opacity: 0.2
     });
 
+    /* latitudes */
+    for (var i = 1; i < 10; i++) {
+      var phi = (i / 10) * Math.PI;
+      var y = Math.cos(phi) * R;
+      var rr = Math.sin(phi) * R;
+      var lat = [];
+      for (var a = 0; a <= 72; a++) {
+        var t = (a / 72) * Math.PI * 2;
+        lat.push(new THREE.Vector3(Math.cos(t) * rr, y, Math.sin(t) * rr));
+      }
+      globe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lat), lineMat));
+    }
+
+    /* meridians */
+    for (var m = 0; m < 8; m++) {
+      var theta = (m / 8) * Math.PI * 2;
+      var lon = [];
+      for (var b = 0; b <= 72; b++) {
+        var ph = (b / 72) * Math.PI;
+        lon.push(new THREE.Vector3(
+          Math.cos(theta) * Math.sin(ph) * R,
+          Math.cos(ph) * R,
+          Math.sin(theta) * Math.sin(ph) * R
+        ));
+      }
+      globe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lon), lineMat));
+    }
+
+    /* nodes sitting on the sphere */
+    var nodes = [];
+    var golden = Math.PI * (3 - Math.sqrt(5));
+    var N = 70;
+    for (var k = 0; k < N; k++) {
+      var yy = 1 - (k / (N - 1)) * 2;
+      var rad = Math.sqrt(Math.max(0, 1 - yy * yy));
+      var ang = golden * k;
+      nodes.push(new THREE.Vector3(
+        Math.cos(ang) * rad * R * 1.01,
+        yy * R * 1.01,
+        Math.sin(ang) * rad * R * 1.01
+      ));
+    }
+
+    var nodeGeo = new THREE.BufferGeometry().setFromPoints(nodes);
+    globe.add(new THREE.Points(nodeGeo, new THREE.PointsMaterial({
+      color: MINT,
+      size: 0.075,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      sizeAttenuation: true
+    })));
+
+    /* core */
+    var core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13, 20, 20),
+      new THREE.MeshBasicMaterial({ color: PAPER })
+    );
+    root.add(core);
+
+    var glow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.34, 20, 20),
+      new THREE.MeshBasicMaterial({ color: MINT, transparent: true, opacity: 0.1, depthWrite: false })
+    );
+    root.add(glow);
+
+    /* expanding signal rings */
+    var pulseRings = [];
+    for (var p = 0; p < 3; p++) {
+      var ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.995, 1, 96),
+        new THREE.MeshBasicMaterial({
+          color: MINT,
+          transparent: true,
+          opacity: 0.28,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.rotation.z = 0.22;
+      ring.userData.offset = p / 3;
+      pulseRings.push(ring);
+      root.add(ring);
+    }
+
+    /* sizing */
+    function resize() {
+      var w = stage.clientWidth;
+      var h = stage.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    resize();
+    if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
+    else window.addEventListener("resize", resize);
+
+    /* pause when out of view */
+    var running = true;
     if ("IntersectionObserver" in window) {
       new IntersectionObserver(function (entries) {
-        visible = entries[0].isIntersecting;
-        if (visible && !document.hidden) start();
-        else stop();
-      }, { threshold: 0.02 }).observe(hero);
+        running = entries[0].isIntersecting;
+      }, { threshold: 0.05 }).observe(stage);
     }
 
-    start();
-  }
+    var clock = new THREE.Clock();
 
-  /* ---------------------------------------------------------
-     2. Toast (feedback for copy actions)
-     --------------------------------------------------------- */
-  var toastTimer = null;
+    function frame() {
+      requestAnimationFrame(frame);
+      if (!running) return;
 
-  function toast(message) {
-    var el = document.getElementById("toast");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "toast";
-      el.className = "toast";
-      el.setAttribute("role", "status");
-      el.setAttribute("aria-live", "polite");
-      document.body.appendChild(el);
-    }
-    el.textContent = message;
-    el.classList.add("show");
-    if (toastTimer) window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(function () {
-      el.classList.remove("show");
-    }, 3200);
-  }
+      var dt = Math.min(clock.getDelta(), 0.05);
+      var t = clock.elapsedTime;
 
-  function copyText(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text).catch(function () {
-        return legacyCopy(text);
-      });
-    }
-    return Promise.resolve(legacyCopy(text));
-  }
+      if (!reduceMotion) {
+        root.rotation.y += dt * 0.09;
+        root.rotation.x = Math.sin(t * 0.28) * 0.06;
+        globe.rotation.y -= dt * 0.05;
+        core.scale.setScalar(0.9 + Math.sin(t * 1.6) * 0.1);
+        glow.scale.setScalar(1 + Math.sin(t * 1.6) * 0.06);
 
-  function legacyCopy(text) {
-    var ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.top = "-1000px";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand("copy"); } catch (err) { /* ignore */ }
-    document.body.removeChild(ta);
-  }
-
-  /* ---------------------------------------------------------
-     3. Email / phone links — always give the user something
-     --------------------------------------------------------- */
-  function initContactLinks() {
-    var links = document.querySelectorAll('a[href^="mailto:"], a[href^="tel:"]');
-
-    Array.prototype.forEach.call(links, function (a) {
-      a.addEventListener("click", function (e) {
-        var href = a.getAttribute("href");
-        var isMail = href.indexOf("mailto:") === 0;
-        var value = href
-          .replace(/^mailto:/, "")
-          .replace(/^tel:/, "")
-          .split("?")[0]
-          .trim();
-
-        // keep the default behaviour so a configured mail/phone app still opens
-        if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-
-        copyText(value).then(function () {
-          toast((isMail ? "Email copied — " : "Number copied — ") + value);
-        }, function () {
-          toast(isMail ? "Email: " + value : "Phone: " + value);
+        pulseRings.forEach(function (ring) {
+          var phase = (t * 0.24 + ring.userData.offset) % 1;
+          ring.scale.setScalar(0.35 + phase * 1.75);
+          ring.material.opacity = 0.3 * (1 - phase) * (1 - phase);
         });
-      });
-    });
-
-    // make the address itself easy to select
-    Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (el) {
-      el.addEventListener("click", function () {
-        copyText(el.getAttribute("data-copy")).then(function () {
-          toast("Copied — " + el.getAttribute("data-copy"));
-        });
-      });
-    });
-  }
-
-  /* ---------------------------------------------------------
-     4. Scroll reveal
-     --------------------------------------------------------- */
-  function initReveal() {
-    var items = Array.prototype.slice.call(document.querySelectorAll(".reveal"));
-    if (!items.length) return;
-
-    if (reduceMotion || !("IntersectionObserver" in window)) {
-      items.forEach(function (el) { el.classList.add("in"); });
-      return;
-    }
-
-    items.forEach(function (el) {
-      var siblings = el.parentElement
-        ? Array.prototype.filter.call(el.parentElement.children, function (c) {
-            return c.classList.contains("reveal");
-          })
-        : [];
-      var idx = siblings.indexOf(el);
-      if (idx > 0) el.style.setProperty("--d", Math.min(idx * 90, 450) + "ms");
-    });
-
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (!entry.isIntersecting) return;
-        var el = entry.target;
-        el.classList.add("in");
-        if (el.hasAttribute("data-tilt")) {
-          window.setTimeout(function () { el.classList.add("ready"); }, 950);
-        }
-        io.unobserve(el);
-      });
-    }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
-
-    items.forEach(function (el) { io.observe(el); });
-  }
-
-  /* ---------------------------------------------------------
-     5. 3D tilt on cards (pointer only)
-     --------------------------------------------------------- */
-  function initTilt() {
-    if (reduceMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-
-    var cards = document.querySelectorAll("[data-tilt]");
-
-    Array.prototype.forEach.call(cards, function (card) {
-      var raf = null;
-
-      card.addEventListener("pointermove", function (e) {
-        var rect = card.getBoundingClientRect();
-        var px = (e.clientX - rect.left) / rect.width;
-        var py = (e.clientY - rect.top) / rect.height;
-
-        card.style.setProperty("--mx", (px * 100).toFixed(1) + "%");
-        card.style.setProperty("--my", (py * 100).toFixed(1) + "%");
-
-        if (raf) cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(function () {
-          var rx = (0.5 - py) * 7;
-          var ry = (px - 0.5) * 9;
-          card.style.transform =
-            "perspective(950px) rotateX(" + rx.toFixed(2) + "deg) rotateY(" + ry.toFixed(2) +
-            "deg) translate3d(0,-4px,0)";
-        });
-      }, { passive: true });
-
-      card.addEventListener("pointerleave", function () {
-        if (raf) cancelAnimationFrame(raf);
-        card.style.transform = "";
-      });
-    });
-  }
-
-  /* ---------------------------------------------------------
-     6. Animated counters
-     --------------------------------------------------------- */
-  function initCounters() {
-    var nums = document.querySelectorAll("[data-count]");
-    if (!nums.length) return;
-
-    function animate(el) {
-      var end = parseFloat(el.getAttribute("data-count"));
-      var decimals = parseInt(el.getAttribute("data-decimals") || "0", 10);
-      var suffix = el.getAttribute("data-suffix") || "";
-
-      if (reduceMotion) {
-        el.textContent = end.toFixed(decimals) + suffix;
-        return;
       }
 
-      var start = performance.now();
-      var duration = 1400;
-
-      function tick(now) {
-        var p = Math.min((now - start) / duration, 1);
-        var eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = (end * eased).toFixed(decimals) + suffix;
-        if (p < 1) requestAnimationFrame(tick);
-      }
-      requestAnimationFrame(tick);
+      renderer.render(scene, camera);
     }
 
-    if (!("IntersectionObserver" in window)) {
-      nums.forEach(animate);
-      return;
-    }
-
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (!entry.isIntersecting) return;
-        animate(entry.target);
-        io.unobserve(entry.target);
-      });
-    }, { threshold: 0.6 });
-
-    nums.forEach(function (n) { io.observe(n); });
+    frame();
   }
 
-  /* ---------------------------------------------------------
-     7. Rotating role titles
-     --------------------------------------------------------- */
-  function initRoleRotator() {
-    var el = document.getElementById("role-text");
-    if (!el) return;
+  /* =========================================================
+     3. Year
+     ========================================================= */
+  var yearEl = document.getElementById("year");
+  if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
-    var roles = [
-      "SDM Deployment Engineer",
-      "Telecom Core Network Engineer",
-      "IMS / VoLTE Operations",
-      "CNF / VNF & Kubernetes Ops",
-      "Change & Service Validation"
-    ];
+  /* =========================================================
+     4. Mobile navigation
+     ========================================================= */
+  var rail = document.getElementById("rail");
+  var toggle = document.getElementById("nav-toggle");
 
-    if (reduceMotion) {
-      el.textContent = roles[0];
-      return;
-    }
+  function closeNav() {
+    if (!rail || !toggle) return;
+    rail.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+  }
 
-    var roleIndex = 0;
-    var charIndex = roles[0].length;
-    var deleting = false;
+  if (rail && toggle) {
+    toggle.addEventListener("click", function () {
+      var open = rail.classList.toggle("is-open");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
 
-    function step() {
-      var current = roles[roleIndex];
+    rail.querySelectorAll(".rail-nav a").forEach(function (link) {
+      link.addEventListener("click", closeNav);
+    });
 
-      if (!deleting) {
-        charIndex++;
-        el.textContent = current.slice(0, charIndex);
-        if (charIndex >= current.length) {
-          deleting = true;
-          window.setTimeout(step, 2100);
-          return;
-        }
-        window.setTimeout(step, 52 + Math.random() * 40);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeNav();
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!rail.classList.contains("is-open")) return;
+      if (!rail.contains(e.target)) closeNav();
+    });
+  }
+
+  /* =========================================================
+     5. Reveal on scroll
+     ========================================================= */
+  var revealables = document.querySelectorAll(".reveal");
+
+  if (reduceMotion || !("IntersectionObserver" in window)) {
+    revealables.forEach(function (el) { el.classList.add("is-in"); });
+  } else {
+    var revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-in");
+        revealObserver.unobserve(entry.target);
+      });
+    }, {
+      rootMargin: "0px 0px -8% 0px",
+      threshold: 0.12
+    });
+
+    revealables.forEach(function (el) { revealObserver.observe(el); });
+  }
+
+  /* =========================================================
+     6. Active section in the sidebar
+     ========================================================= */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll(".rail-nav a"));
+  var sections = navLinks
+    .map(function (link) {
+      var id = link.getAttribute("href");
+      return id && id.length > 1 ? document.querySelector(id) : null;
+    })
+    .filter(Boolean);
+
+  function setActive(id) {
+    navLinks.forEach(function (link) {
+      if (link.getAttribute("href") === "#" + id) link.setAttribute("aria-current", "true");
+      else link.removeAttribute("aria-current");
+    });
+  }
+
+  if (sections.length && "IntersectionObserver" in window) {
+    var visible = new Map();
+
+    var sectionObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) visible.set(entry.target.id, entry.intersectionRatio);
+        else visible.delete(entry.target.id);
+      });
+
+      var best = null;
+      var bestRatio = 0;
+      visible.forEach(function (ratio, id) {
+        if (ratio >= bestRatio) { bestRatio = ratio; best = id; }
+      });
+
+      if (best) setActive(best);
+    }, {
+      rootMargin: "-18% 0px -55% 0px",
+      threshold: [0.05, 0.25, 0.5, 0.75]
+    });
+
+    sections.forEach(function (section) { sectionObserver.observe(section); });
+  }
+
+  /* =========================================================
+     7. Copy to clipboard
+     ========================================================= */
+  document.querySelectorAll("[data-copy]").forEach(function (button) {
+    var original = button.textContent;
+
+    button.addEventListener("click", function () {
+      var value = button.getAttribute("data-copy") || "";
+
+      function done() {
+        button.classList.add("is-done");
+        button.textContent = "Copied to clipboard";
+        window.setTimeout(function () {
+          button.classList.remove("is-done");
+          button.textContent = original;
+        }, 2200);
+      }
+
+      function fallback() {
+        var input = document.createElement("textarea");
+        input.value = value;
+        input.setAttribute("readonly", "");
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        try { document.execCommand("copy"); } catch (err) { /* ignore */ }
+        document.body.removeChild(input);
+        done();
+      }
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(value).then(done, fallback);
       } else {
-        charIndex--;
-        el.textContent = current.slice(0, charIndex);
-        if (charIndex <= 0) {
-          deleting = false;
-          roleIndex = (roleIndex + 1) % roles.length;
-          window.setTimeout(step, 320);
-          return;
-        }
-        window.setTimeout(step, 26);
+        fallback();
       }
-    }
+    });
+  });
 
-    window.setTimeout(function () { deleting = true; step(); }, 2600);
-  }
+  /* =========================================================
+     8. Smooth anchors with sticky-header offset
+     ========================================================= */
+  document.querySelectorAll('a[href^="#"]').forEach(function (link) {
+    link.addEventListener("click", function (e) {
+      var id = link.getAttribute("href");
+      if (!id || id === "#") return;
+      var targetEl = document.querySelector(id);
+      if (!targetEl) return;
 
-  /* ---------------------------------------------------------
-     8. Nav / progress / misc
-     --------------------------------------------------------- */
-  function initChrome() {
-    var nav = document.getElementById("nav");
-    var toggle = document.getElementById("nav-toggle");
-    var links = document.getElementById("nav-links");
-    var progress = document.getElementById("progress");
-    var year = document.getElementById("year");
+      e.preventDefault();
+      var headerOffset = window.innerWidth <= 900 ? 76 : 0;
+      var top = targetEl.getBoundingClientRect().top + window.pageYOffset - headerOffset;
 
-    if (year) year.textContent = new Date().getFullYear();
-
-    function onScroll() {
-      var y = window.scrollY || window.pageYOffset;
-      if (nav) nav.classList.toggle("scrolled", y > 24);
-      if (progress) {
-        var max = document.documentElement.scrollHeight - window.innerHeight;
-        progress.style.width = (max > 0 ? (y / max) * 100 : 0) + "%";
-      }
-    }
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-
-    if (toggle && links) {
-      toggle.addEventListener("click", function () {
-        var open = links.classList.toggle("open");
-        toggle.setAttribute("aria-expanded", open ? "true" : "false");
-        if (nav) nav.classList.toggle("open", open);
-        document.body.style.overflow = open ? "hidden" : "";
+      window.scrollTo({
+        top: top,
+        behavior: reduceMotion ? "auto" : "smooth"
       });
 
-      Array.prototype.forEach.call(links.querySelectorAll("a"), function (a) {
-        a.addEventListener("click", function () {
-          links.classList.remove("open");
-          toggle.setAttribute("aria-expanded", "false");
-          if (nav) nav.classList.remove("open");
-          document.body.style.overflow = "";
-        });
-      });
+      if (history.replaceState) history.replaceState(null, "", id);
+    });
+  });
 
-      document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape" && links.classList.contains("open")) {
-          links.classList.remove("open");
-          toggle.setAttribute("aria-expanded", "false");
-          if (nav) nav.classList.remove("open");
-          document.body.style.overflow = "";
-        }
-      });
-    }
-  }
-
-  /* ---------------------------------------------------------
+  /* =========================================================
      boot
-     --------------------------------------------------------- */
+     ========================================================= */
   function boot() {
-    initChrome();
-    initReveal();
-    initTilt();
-    initCounters();
-    initRoleRotator();
-    initContactLinks();
     initScene();
+    initContactScene();
   }
 
   if (document.readyState === "loading") {

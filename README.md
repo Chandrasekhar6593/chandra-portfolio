@@ -1,19 +1,39 @@
-# Nangili Chandra Sekhar — 3D Portfolio
+# Nangili Chandra Sekhar — Portfolio
 
 **Live:** <https://chandrasekhar6593.github.io/chandra-portfolio/>
 
-A single-page, 3D portfolio built for SDM / telecom deployment roles.
-No build step, no framework — plain HTML, CSS and Three.js.
+A single-page portfolio for SDM / telecom-core deployment roles.
+No build step, no framework, no dependencies — plain HTML, CSS and a small
+amount of vanilla JavaScript.
+
+## Design
+
+Editorial "technical dossier" layout: warm paper background, ink typography,
+one deep-green accent, hairline rules and a sticky sidebar. Display type is
+Instrument Serif, body is Inter, labels are JetBrains Mono.
+
+- Sticky left rail with section index, availability status and résumé download
+- 3D hero: a rotating subscriber-data lattice rendered with Three.js
+- Numbered sections: Profile, Capabilities, Experience, Workflow, Background, Contact
+- Hairline capability grid, phase-based experience card, four-step deployment workflow
+- Dark contact split: links on the left, a live 3D signal globe and availability details on the right,
+  plus one-click copy for the email address
+- Scroll reveals, active-section highlighting, reduced-motion and print styles
+- Mobile: rail collapses to a sticky top bar with a slide-down menu
 
 ## Files
 
 ```
 index.html            markup + content
-styles.css            design system, layout, responsive rules
-main.js               Three.js hero scene + interactions
+styles.css            design tokens, layout, components, responsive rules
+main.js               both 3D scenes, nav, reveal, scroll-spy, copy-to-clipboard, year
 assets/
-  Nangili_Chandra_Sekhar_Resume.pdf   served by the "Download resume" buttons
-frame-test.html       (temporary dev harness — safe to delete)
+  Nangili_Chandra_Sekhar_SDM_Deployment_Engineer.pdf   served by every "resume" link
+  Nangili_Chandra_Sekhar_Resume.pdf                    previous résumé (unused)
+  three.min.js                                         local Three.js build used by the 3D scenes
+build_resume.py       regenerates the résumé DOCX/PDF from the same content
+options/              four design directions, A–D (gallery at options/index.html)
+github-profile/       README for the GitHub profile repo
 ```
 
 ## Preview locally
@@ -25,46 +45,24 @@ python -m http.server 8787
 
 Then open <http://localhost:8787>. Opening `index.html` directly also works.
 
-## What's in the page
+## Content source
 
-- **3D hero** — a global telecom mesh: wireframe globe built from latitude and
-  meridian lines, 11 roaming arcs with travelling light pulses, three orbit
-  rings with satellites, a glowing atmosphere and a 1,100-point starfield.
-  Reacts to the pointer, pauses when off-screen or the tab is hidden.
-- **Scroll reveals**, animated counters, typing role titles, scroll progress bar.
-- **3D tilt cards** for expertise and "how I work" sections.
-- Sections: About, Expertise (SDM / deployment / cloud-native / signalling),
-  Experience timeline, Highlights, Education, Contact.
-- Fully responsive, keyboard accessible, respects `prefers-reduced-motion`,
-  Lighthouse: Accessibility 100 · Best Practices 100 · SEO 100.
+Everything on the page mirrors `Nangili_Chandra_Sekhar_SDM_Deployment_Engineer.pdf`
+— 2.5+ years, Nokia SDM / HSS / UDM / AUSF deployment and validation, Rakuten
+Mobile through Tech Mahindra, B.Tech ECE (2019–2023), Indore.
 
-## Before you publish — 2 things to check
+## Deploy
 
-1. **LinkedIn URL** — linked to
-   `https://www.linkedin.com/in/nangili-chandra-sekhar-169219246`.
-2. **Location line** — "Based in India · open to relocation" and the contact
-   footer line; adjust to your actual city / preference.
-3. **Resume file** — if you update your CV, replace
-   `assets/Nangili_Chandra_Sekhar_Resume.pdf` (keep the filename so the buttons
-   keep working, or update both `href`s in `index.html`).
-
-Everything else (summary, skills, timeline bullets, education, languages) comes
-from your current resume.
-
-## Deploy it free
-
-Already deployed with **GitHub Pages** from the `main` branch (root).
-Any push to `main` republishes the site automatically.
-
-To move it to a custom domain or another host:
+Deployed with **GitHub Pages** from the `main` branch (root). Any push to `main`
+republishes the site automatically.
 
 - **Netlify / Vercel** — drag the folder onto <https://app.netlify.com/drop>, or
   import the repo. No build command, publish directory `.`.
-- **Custom domain** — add a `CNAME` file with your domain and configure DNS.
+- **Custom domain** — add a `CNAME` file and configure DNS.
 
 ## Notes
 
-- Three.js loads from jsDelivr; the page needs internet access for the 3D scene
-  and Google Fonts. If the CDN is blocked, the rest of the page still works.
-- To trim the scene for low-end phones, lower `NODES` and `particleCount` in
-  `main.js`.
+- Fonts load from Google Fonts; the page degrades to system serif/sans/mono offline.
+- `assets/three.min.js` is no longer referenced and can be deleted.
+- Bump the `?v=` query on `styles.css` / `main.js` in `index.html` after a deploy
+  if a browser keeps serving a cached sheet.
