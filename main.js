@@ -664,6 +664,17 @@
 
         if (win) return;
 
+        // Embedded previews (an iframe on a page) often refuse both popups
+        // and top-level navigation, so copying is the useful outcome there.
+        var embedded = false;
+        try { embedded = window.self !== window.top; } catch (errTop) { embedded = true; }
+
+        if (embedded) {
+          copySilently(href);
+          flashLink(link, "Link copied — paste in your browser");
+          return;
+        }
+
         var here = window.location.href;
         try { window.location.href = href; } catch (err2) { /* sandboxed */ }
 
