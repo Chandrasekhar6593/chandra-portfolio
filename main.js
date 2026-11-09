@@ -595,6 +595,88 @@
   });
 
   /* =========================================================
+     7b. Contact links - never a dead click
+     ========================================================= */
+  function copySilently(value) {
+    function legacy() {
+      var input = document.createElement("textarea");
+      input.value = value;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.top = "-1000px";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      try { document.execCommand("copy"); } catch (err) { /* ignore */ }
+      document.body.removeChild(input);
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(value).catch(legacy);
+    }
+    legacy();
+    return Promise.resolve();
+  }
+
+  function flashLink(link, message) {
+    var value = link.querySelector(".cl-value");
+    if (!value) return;
+    if (!value.dataset.original) value.dataset.original = value.textContent;
+    value.textContent = message;
+    link.classList.add("is-done");
+    window.clearTimeout(link.flashTimer);
+    link.flashTimer = window.setTimeout(function () {
+      value.textContent = value.dataset.original;
+      link.classList.remove("is-done");
+    }, 2600);
+  }
+
+  document.querySelectorAll("a.contact-link").forEach(function (link) {
+    link.addEventListener("click", function (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
+
+      var href = link.getAttribute("href") || "";
+      var isMail = href.indexOf("mailto:") === 0;
+      var isTel = href.indexOf("tel:") === 0;
+
+      // Email / phone: let the mail or dialler app open, and copy as a backup.
+      if (isMail || isTel) {
+        var value = href.replace(/^mailto:/i, "").replace(/^tel:/i, "").split("?")[0];
+        copySilently(value);
+        flashLink(link, "Copied — " + value);
+        return;
+      }
+
+      // External profile: open a tab; if that is blocked, navigate in this
+      // tab; if even that is blocked, copy the link so the click still helps.
+      if (/^https?:/i.test(href)) {
+        e.preventDefault();
+
+        var win = null;
+        try {
+          // No "noopener" feature string: with it window.open() returns null
+          // even on success. Detach the opener on the window instead.
+          win = window.open(href, "_blank");
+          if (win) win.opener = null;
+        } catch (err) {
+          win = null;
+        }
+
+        if (win) return;
+
+        var here = window.location.href;
+        try { window.location.href = href; } catch (err2) { /* sandboxed */ }
+
+        window.setTimeout(function () {
+          if (window.location.href !== here) return;
+          copySilently(href);
+          flashLink(link, "Link copied — paste in your browser");
+        }, 700);
+      }
+    });
+  });
+
+  /* =========================================================
      8. Smooth anchors with sticky-header offset
      ========================================================= */
   document.querySelectorAll('a[href^="#"]').forEach(function (link) {

@@ -840,6 +840,11 @@ main {
 .copy:hover { color: #7fd6c2; border-color: #7fd6c2; }
 .copy.is-done { color: #7fd6c2; border-color: #7fd6c2; }
 
+.contact-link.is-done,
+.contact-link.is-done .cl-value,
+.contact-link.is-done .cl-arrow { color: #7fd6c2; }
+.contact-link.is-done { border-bottom-color: rgba(127, 214, 194, 0.55); }
+
 /* ---
    contact stage (3D signal)
    --- */
